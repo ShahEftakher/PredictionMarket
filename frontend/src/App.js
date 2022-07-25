@@ -19,6 +19,7 @@ function App() {
         predictionMarket.bets(SIDE.BIDEN),
         predictionMarket.bets(SIDE.TRUMP),
       ]);
+
       const betPredictions = {
         labels: ['Trump', 'Biden'],
         datasets: [
@@ -34,9 +35,29 @@ function App() {
         predictionMarket.betsPerGambler(signerAddress, SIDE.TRUMP),
       ]);
       setMyBets(myBets);
-      //console.log(myBets[0].toString());
       setBetPredictions(betPredictions);
       setPredictionMarket(predictionMarket);
+
+      predictionMarket.on('BetPlaced', (gambler, side, amount) => {
+        let info = {
+          gambler,
+          side,
+          amount: ethers.utils.formatUnits(amount, 18),
+        };
+        console.log(info);
+      });
+
+      predictionMarket.on('ResultUpdated', (result) => {
+        console.log(result);
+      });
+
+      predictionMarket.on('BetWithdrawn', (sender, amount) => {
+        let info = {
+          sender,
+          amount: ethers.utils.formatUnits(amount, 18),
+        };
+        console.log(info);
+      });
     };
     init();
   }, []);

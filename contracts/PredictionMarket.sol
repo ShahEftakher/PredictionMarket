@@ -17,6 +17,10 @@ contract PredictionMarket {
     mapping(address => mapping(Side => uint256)) public betsPerGambler;
     address public oracle;
 
+    event BetPlaced(address indexed gambler, Side side, uint256 amount);
+    event ResultUpdated(Result result);
+    event BetWithdrawn(address indexed gambler, uint256 amount);
+
     constructor(address _oracle) {
         oracle = _oracle;
     }
@@ -25,6 +29,7 @@ contract PredictionMarket {
         require(electionFinished == false, "election is finished");
         bets[_side] += msg.value;
         betsPerGambler[msg.sender][_side] += msg.value;
+        emit BetPlaced(msg.sender, _side, msg.value);
     }
 
     function withdrawGain() external {
@@ -38,6 +43,7 @@ contract PredictionMarket {
         betsPerGambler[msg.sender][Side.Biden] = 0;
         betsPerGambler[msg.sender][Side.Trump] = 0;
         winner.transfer(gain);
+        emit BetWithdrawn(msg.sender, gain);
     }
 
     function reportResult(Side _winner, Side _loser) external {
@@ -45,5 +51,6 @@ contract PredictionMarket {
         result.winner = _winner;
         result.loser = _loser;
         electionFinished = true;
+        emit ResultUpdated(result);
     }
 }
