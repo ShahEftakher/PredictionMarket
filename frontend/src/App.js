@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import getBlockchain from './ethereum.js';
 import { ethers } from 'ethers';
+import Web3 from 'web3';
+import PredictionMarketABI from './contracts/PredictionMarket.json';
 
 const SIDE = {
   TRUMP: 1,
@@ -11,10 +13,36 @@ function App() {
   const [predictionMarket, setPredictionMarket] = useState(undefined);
   const [betPredictions, setBetPredictions] = useState(undefined);
   const [myBets, setMyBets] = useState(undefined);
+  const [txs, setTxs] = useState([]);
+  const [userBets, setUserBets] = useState([]);
 
   useEffect(() => {
+    window.ethereum.on('accounrtChanged', () => {
+      window.location.reload();
+    });
     const init = async () => {
       const { signerAddress, predictionMarket } = await getBlockchain();
+      const web3 = new Web3(window.ethereum);
+      const web3Contract = new web3.eth.Contract(
+        PredictionMarketABI.abi,
+        predictionMarket.address
+      );
+
+      web3Contract.setProvider(web3.currentProvider);
+
+      console.log(web3Contract);
+
+      const options = {
+        filter: {
+          gambler: signerAddress,
+        },
+        fromBlock: 0,
+        toBlock: 'latest',
+      };
+      const result = await web3Contract.getPastEvents('BetPlaced', options);
+      console.log(result);
+      setUserBets(result);
+
       const bets = await Promise.all([
         predictionMarket.bets(SIDE.BIDEN),
         predictionMarket.bets(SIDE.TRUMP),
@@ -38,13 +66,19 @@ function App() {
       setBetPredictions(betPredictions);
       setPredictionMarket(predictionMarket);
 
-      predictionMarket.on('BetPlaced', (gambler, side, amount) => {
-        let info = {
-          gambler,
-          side,
-          amount: ethers.utils.formatUnits(amount, 18),
-        };
-        console.log(info);
+      predictionMarket.on('BetPlaced', async (gambler, side, amount, event) => {
+        setTxs((currentTxs) => [
+          ...currentTxs,
+          {
+            txHash: event.transactionHash,
+            gambler,
+            side,
+            amount: ethers.utils.formatUnits(String(amount), 18),
+          },
+        ]);
+        const result = await web3Contract.getPastEvents('BetPlaced', options);
+        console.log(result);
+        setUserBets(result);
       });
 
       predictionMarket.on('ResultUpdated', (result) => {
@@ -99,10 +133,10 @@ function App() {
         </div>
       </div>
 
-      <div className="row">
+      <div className="row m-3">
         <div className="col-sm-6">
           <div className="card">
-            <img src="./img/trump.png" />
+            {/* <img src="./img/trump.png" /> */}
             <div className="card-body">
               <h5 className="card-title">Trump</h5>
               <form
@@ -124,7 +158,7 @@ function App() {
 
         <div className="col-sm-6">
           <div className="card">
-            <img src="./img/biden.png" />
+            {/* <img src="./img/biden.png" /> */}
             <div className="card-body">
               <h5 className="card-title">Biden</h5>
               <form
@@ -145,11 +179,39 @@ function App() {
         </div>
       </div>
 
-      <div className="row">
+      <div className="row border shadow p-2 mb-4">
         <h2>Your bets</h2>
-        <ul>
-          <li>Biden: {myBets[0].toString()} ETH (wei)</li>
-          <li>Trump: {myBets[1].toString()} ETH (wei)</li>
+        <ul className="col m-2">
+          <li>
+            Biden: {ethers.utils.formatUnits(myBets[0].toString(), 18)} ETH
+          </li>
+          <li>
+            Trump: {ethers.utils.formatUnits(myBets[1].toString(), 18)} ETH
+          </li>
+        </ul>
+      </div>
+
+      <div className="row border shadow p-2 mb-4">
+        <h2>Your bet History</h2>
+        <ul className="col m-2">
+          {userBets.map((bet) => (
+            <li key={bet.transactionHash}>
+              {bet.returnValues.gambler} bet {bet.returnValues.amount} ETH on{' '}
+              {bet.returnValues.side === SIDE.BIDEN ? 'Biden' : 'Trump'}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="row border shadow p-2">
+        <h2>All Bets</h2>
+        <ul className="col m-2">
+          {txs.map((tx) => (
+            <li key={tx.transactionHash}>
+              {tx.gambler} placed {tx.amount} ETH on{' '}
+              {tx.side === 1 ? 'Trump' : 'Biden'}
+            </li>
+          ))}
         </ul>
       </div>
 
